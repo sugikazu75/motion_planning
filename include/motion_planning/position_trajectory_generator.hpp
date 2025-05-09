@@ -51,4 +51,53 @@ void posTrajectoryGenerator(const Eigen::Vector3d x_init, const Eigen::Vector3d 
     x_traj.at(i) << x(0), y(0), z(0);
   }
 }
+
+void minJerkInterpolationPosVelAcc(const std::vector<Eigen::VectorXd> x_traj, double duration,
+                                   std::vector<Eigen::VectorXd>& pos_traj, std::vector<Eigen::VectorXd>& vel_traj,
+                                   std::vector<Eigen::VectorXd>& acc_traj)
+{
+  int x_size = x_traj.at(0).size();
+  int num_samples = x_traj.size();
+
+  if (num_samples < 2)
+    return;
+
+  std::vector<double> times(num_samples);
+  for (int i = 0; i < num_samples; ++i)
+    times[i] = i * duration / (num_samples - 1);
+
+  pos_traj.resize(num_samples, Eigen::VectorXd(x_size));
+  vel_traj.resize(num_samples, Eigen::VectorXd(x_size));
+  acc_traj.resize(num_samples, Eigen::VectorXd(x_size));
+
+  for (int i = 0; i < x_size; i++)
+  {
+    agi::Polynomial<Eigen::HouseholderQR<agi::Matrix<>>> poly(11, agi::Vector<3>(0, 0, 1), 2);  // min-jerk
+
+    poly.scale(0, duration);
+
+    // initial state
+    poly.addConstraint(0, agi::Vector<3>(x_traj.at(0)(i), 0.0, 0.0));
+
+    // mid states
+    for (int j = 1; j < num_samples - 1; j++)
+      poly.addConstraint(times.at(j), agi::Vector<1>(x_traj.at(j)(i)));
+
+    // final state
+    poly.addConstraint(duration, agi::Vector<3>(x_traj.at(num_samples - 1)(i), 0.0, 0.0));
+
+    poly.solve();
+
+    for (int j = 0; j < num_samples; j++)
+    {
+      double t = times.at(j);
+      Eigen::Vector3d res;
+      poly.eval(t, res);
+
+      pos_traj.at(j)(i) = res(0);
+      vel_traj.at(j)(i) = res(1);
+      acc_traj.at(j)(i) = res(2);
+    }
+  }
+}
 }  // namespace motion_planning
