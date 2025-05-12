@@ -11,7 +11,7 @@ bool jointTrajectory(const pinocchio::Model& model, pinocchio::Data& data, const
                      const Eigen::VectorXd& q_init, bool debug = false)
 {
   Eigen::VectorXd q = q_init;
-  q_traj.resize(x_des.size());
+  q_traj.resize(x_des.size(), q_init);
 
   bool success = true;
   for (size_t i = 0; i < x_des.size(); ++i)
