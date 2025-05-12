@@ -17,6 +17,14 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
   const double damp = 1e-12;
   Eigen::VectorXd q = q_init;
 
+  bool is_floating_base = model.joints[1].shortname() == "JointModelFreeFlyer" ? true : false;
+  if (debug)
+  {
+    std::cout << "is_floating_base: " << is_floating_base << std::endl;
+    std::cout << "q_init:" << std::endl;
+    std::cout << q.transpose() << std::endl;
+  }
+
   // IK iteration
   for (int i = 0; i < max_iter; ++i)
   {
@@ -29,6 +37,7 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
       std::cout << "Iteration " << i << std::endl;
       std::cout << "q = " << std::endl;
       std::cout << q.transpose() << std::endl;
+      std::cout << "x_curr:" << std::endl;
       std::cout << x_curr.transpose() << std::endl;
       std::cout << "error:" << std::endl;
       std::cout << err.transpose() << std::endl;
@@ -43,11 +52,16 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
 
     Eigen::MatrixXd J6 = Eigen::MatrixXd::Zero(6, model.nv);
     pinocchio::computeFrameJacobian(model, data, q, frame_id, pinocchio::WORLD, J6);  // world frame
-    Eigen::MatrixXd J = J6.topRows(3).rightCols(model.njoints - 2);                   // position. universe and root
+    Eigen::MatrixXd J;
+    if (is_floating_base)
+      J = J6.topRows(3).rightCols(model.nv - 6);  // position. ignore root link 6 elements
+    else
+      J = J6.topRows(3);  // position.
+
     Eigen::MatrixXd JJt;
     JJt.noalias() = J * J.transpose() + damp * Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd v = Eigen::VectorXd::Zero(model.nv);
-    v.tail(model.njoints - 2) = J.transpose() * JJt.ldlt().solve(err);
+    v.tail(J.cols()) = J.transpose() * JJt.ldlt().solve(err);
     q = pinocchio::integrate(model, q, v * DT);
 
     if (debug)
