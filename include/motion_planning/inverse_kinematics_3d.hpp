@@ -13,9 +13,11 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
              const Eigen::Vector3d& x_des, const Eigen::VectorXd& q_init, Eigen::VectorXd& q_out, bool debug = false,
              int max_iter = 100, double eps = 1e-4)
 {
-  const double DT = 1.0;
   const double damp = 1e-12;
   Eigen::VectorXd q = q_init;
+  q_out = q_init;
+
+  const pinocchio::SE3 oMdes(Eigen::Matrix3d::Identity(), x_des);
 
   bool is_floating_base = model.joints[1].shortname() == "JointModelFreeFlyer" ? true : false;
   if (debug)
@@ -29,8 +31,10 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
   for (int i = 0; i < max_iter; ++i)
   {
     pinocchio::framesForwardKinematics(model, data, q);
+    const pinocchio::SE3 iMd = data.oMf[frame_id].actInv(oMdes);
+    Eigen::Vector3d err = iMd.translation();  // in joint frame
+
     Eigen::Vector3d x_curr = data.oMf[frame_id].translation();
-    Eigen::Vector3d err = x_des - x_curr;  // in world frame
 
     if (debug)
     {
@@ -41,7 +45,6 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
       std::cout << x_curr.transpose() << std::endl;
       std::cout << "error:" << std::endl;
       std::cout << err.transpose() << std::endl;
-      std::cout << std::endl;
     }
 
     if (err.norm() < eps)
@@ -51,18 +54,20 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
     }
 
     Eigen::MatrixXd J6 = Eigen::MatrixXd::Zero(6, model.nv);
-    pinocchio::computeFrameJacobian(model, data, q, frame_id, pinocchio::WORLD, J6);  // world frame
+    pinocchio::computeFrameJacobian(model, data, q, frame_id, pinocchio::LOCAL, J6);  // local frame
     Eigen::MatrixXd J;
+    int n_joint = model.nv;
     if (is_floating_base)
-      J = J6.topRows(3).rightCols(model.nv - 6);  // position. ignore root link 6 elements
-    else
-      J = J6.topRows(3);  // position.
+      n_joint -= 6;
+    J = J6.topRows(3).rightCols(n_joint);  // position. joint part
 
     Eigen::MatrixXd JJt;
     JJt.noalias() = J * J.transpose() + damp * Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd v = Eigen::VectorXd::Zero(model.nv);
     v.tail(J.cols()) = J.transpose() * JJt.ldlt().solve(err);
-    q = pinocchio::integrate(model, q, v * DT);
+
+    double alpha = std::min(1.0, 1.0 / err.norm());
+    q = pinocchio::integrate(model, q, v * alpha);
 
     if (debug)
     {
@@ -72,14 +77,11 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
       std::cout << JJt << std::endl;
       std::cout << "v:" << std::endl;
       std::cout << v.transpose() << std::endl;
-      std::cout << std::endl;
+      std::cout << "\n------------------------------\n" << std::endl;
     }
 
     // clamp joint angles to limits
-    for (int i = 0; i < model.nq; ++i)
-    {
-      q(i) = std::max(model.lowerPositionLimit(i), std::min(q(i), model.upperPositionLimit(i)));
-    }
+    q = q.cwiseMax(model.lowerPositionLimit).cwiseMin(model.upperPositionLimit);
   }
   return false;
 }
