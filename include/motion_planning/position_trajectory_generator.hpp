@@ -8,6 +8,65 @@
 
 namespace motion_planning
 {
+class PositionTrajectoryGenerator
+{
+public:
+  PositionTrajectoryGenerator()
+    : poly_x_(11, agi::Vector<3>(0, 0, 1), 2)
+    ,  // min-jerk,
+    poly_y_(11, agi::Vector<3>(0, 0, 1), 2)
+    ,                                        // min-jerk,
+    poly_z_(11, agi::Vector<3>(0, 0, 1), 2)  // min-jerk
+  {
+  }
+
+  void generateTrajectory(Eigen::Vector3d x_init, Eigen::Vector3d x_final, double duration)
+  {
+    poly_x_.scale(0.0, duration);
+    poly_y_.scale(0.0, duration);
+    poly_z_.scale(0.0, duration);
+
+    // initial state. position, velocity and acceleration
+    poly_x_.addConstraint(0, agi::Vector<3>(x_init(0), 0.0, 0.0));
+    poly_y_.addConstraint(0, agi::Vector<3>(x_init(1), 0.0, 0.0));
+    poly_z_.addConstraint(0, agi::Vector<3>(x_init(2), 0.0, 0.0));
+
+    // final state. position, velocity and acceleration
+    poly_x_.addConstraint(duration, agi::Vector<3>(x_final(0), 0.0, 0.0));
+    poly_y_.addConstraint(duration, agi::Vector<3>(x_final(1), 0.0, 0.0));
+    poly_z_.addConstraint(duration, agi::Vector<3>(x_final(2), 0.0, 0.0));
+
+    // solve the polynomial
+    poly_x_.solve();
+    poly_y_.solve();
+    poly_z_.solve();
+  }
+
+  void eval(double t, Eigen::Vector3d& pos, Eigen::Vector3d& vel, Eigen::Vector3d& acc)
+  {
+    Eigen::Vector3d x, y, z;
+    poly_x_.eval(t, x);
+    poly_y_.eval(t, y);
+    poly_z_.eval(t, z);
+
+    pos << x(0), y(0), z(0);
+    vel << x(1), y(1), z(1);
+    acc << x(2), y(2), z(2);
+  }
+
+  void reset()
+  {
+    poly_x_.reset();
+    poly_y_.reset();
+    poly_z_.reset();
+  }
+
+private:
+  agi::Polynomial<Eigen::HouseholderQR<agi::Matrix<>>> poly_x_;
+  agi::Polynomial<Eigen::HouseholderQR<agi::Matrix<>>> poly_y_;
+  agi::Polynomial<Eigen::HouseholderQR<agi::Matrix<>>> poly_z_;
+};
+
 void posTrajectoryGenerator(const Eigen::Vector3d x_init, const Eigen::Vector3d x_final,
 
                             std::vector<Eigen::Vector3d>& x_traj, double duration, double dt = 0.01)
