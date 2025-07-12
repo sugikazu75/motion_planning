@@ -6,9 +6,9 @@
 
 namespace motion_planning
 {
-bool jointTrajectory(const pinocchio::Model& model, pinocchio::Data& data, const pinocchio::FrameIndex frame_id,
-                     const std::vector<Eigen::Vector3d>& x_des, std::vector<Eigen::VectorXd>& q_traj,
-                     const Eigen::VectorXd& q_init, bool debug = false)
+inline bool jointTrajectory(const pinocchio::Model& model, pinocchio::Data& data, const pinocchio::FrameIndex frame_id,
+                            const std::vector<Eigen::Vector3d>& x_des, std::vector<Eigen::VectorXd>& q_traj,
+                            const Eigen::VectorXd& q_init, bool debug = false)
 {
   Eigen::VectorXd q = q_init;
   q_traj.resize(x_des.size(), q_init);

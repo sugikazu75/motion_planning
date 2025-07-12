@@ -67,9 +67,9 @@ private:
   agi::Polynomial<Eigen::HouseholderQR<agi::Matrix<>>> poly_z_;
 };
 
-void posTrajectoryGenerator(const Eigen::Vector3d x_init, const Eigen::Vector3d x_final,
+inline void posTrajectoryGenerator(const Eigen::Vector3d x_init, const Eigen::Vector3d x_final,
 
-                            std::vector<Eigen::Vector3d>& x_traj, double duration, double dt = 0.01)
+                                   std::vector<Eigen::Vector3d>& x_traj, double duration, double dt = 0.01)
 {
   agi::Polynomial<Eigen::HouseholderQR<agi::Matrix<>>> poly_x(11, agi::Vector<3>(0, 0, 1), 2);  // min-jerk
   agi::Polynomial<Eigen::HouseholderQR<agi::Matrix<>>> poly_y(11, agi::Vector<3>(0, 0, 1), 2);  // min-jerk
@@ -111,9 +111,10 @@ void posTrajectoryGenerator(const Eigen::Vector3d x_init, const Eigen::Vector3d 
   }
 }
 
-void minJerkInterpolationPosVelAcc(const std::vector<Eigen::VectorXd> x_traj, double duration,
-                                   std::vector<Eigen::VectorXd>& pos_traj, std::vector<Eigen::VectorXd>& vel_traj,
-                                   std::vector<Eigen::VectorXd>& acc_traj)
+inline void minJerkInterpolationPosVelAcc(const std::vector<Eigen::VectorXd> x_traj, double duration,
+                                          std::vector<Eigen::VectorXd>& pos_traj,
+                                          std::vector<Eigen::VectorXd>& vel_traj,
+                                          std::vector<Eigen::VectorXd>& acc_traj)
 {
   int x_size = x_traj.at(0).size();
   int num_samples = x_traj.size();

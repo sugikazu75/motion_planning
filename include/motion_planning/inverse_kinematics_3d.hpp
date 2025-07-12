@@ -9,9 +9,9 @@
 
 namespace motion_planning
 {
-bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocchio::FrameIndex frame_id,
-             const Eigen::Vector3d& x_des, const Eigen::VectorXd& q_init, Eigen::VectorXd& q_out, bool debug = false,
-             int max_iter = 100, double eps = 1e-4)
+inline bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocchio::FrameIndex frame_id,
+                    const Eigen::Vector3d& x_des, const Eigen::VectorXd& q_init, Eigen::VectorXd& q_out,
+                    bool debug = false, int max_iter = 100, double eps = 1e-4)
 {
   const double damp = 1e-12;
   Eigen::VectorXd q = q_init;
@@ -86,10 +86,10 @@ bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const pinocch
   return false;
 }
 
-void computeJointVelocityAndAcceleration(const pinocchio::Model& model, pinocchio::Data& data, const Eigen::VectorXd& q,
-                                         const Eigen::Vector3d& xdot_des, const Eigen::Vector3d& xddot_des,
-                                         const pinocchio::FrameIndex frame_id, Eigen::VectorXd& dq_out,
-                                         Eigen::VectorXd& ddq_out)
+inline void computeJointVelocityAndAcceleration(const pinocchio::Model& model, pinocchio::Data& data,
+                                                const Eigen::VectorXd& q, const Eigen::Vector3d& xdot_des,
+                                                const Eigen::Vector3d& xddot_des, const pinocchio::FrameIndex frame_id,
+                                                Eigen::VectorXd& dq_out, Eigen::VectorXd& ddq_out)
 {
   Eigen::MatrixXd J6 = Eigen::MatrixXd::Zero(6, model.nv);
   pinocchio::computeFrameJacobian(model, data, q, frame_id, pinocchio::WORLD, J6);  // world frame
