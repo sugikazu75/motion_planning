@@ -61,26 +61,33 @@ inline bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const 
       n_joint -= 6;
     J = J6.topRows(3).rightCols(n_joint);  // position. joint part
 
-    // weight to avoid joint limit
+    // calculate v without weight
+    Eigen::MatrixXd JJt;
+    JJt.noalias() = J * J.transpose() + damp * Eigen::MatrixXd::Identity(3, 3);
+    Eigen::VectorXd v = Eigen::VectorXd::Zero(model.nv);
+    v.tail(J.cols()) = J.transpose() * JJt.ldlt().solve(err);
+
+    // calculate weight matrix to avoid joint limit
     Eigen::VectorXd upper_limit = model.upperPositionLimit;
     Eigen::VectorXd lower_limit = model.lowerPositionLimit;
     Eigen::VectorXd w = Eigen::VectorXd::Ones(n_joint);
     int q_offset = is_floating_base ? 7 : 0;
     int v_offset = is_floating_base ? 6 : 0;
+    double w_weight = 25.0;
     for (int i = 0; i < n_joint; i++)
-      {
-        double q_mid = 0.5 * (lower_limit(i + q_offset) + upper_limit(i + q_offset));
-        double range = upper_limit(i + q_offset) - lower_limit(i + q_offset);
-        double norm = 2.0 * (q(i + q_offset) - q_mid) / range;
-        w(i) = 1.0 + 25 * norm * norm;
-      }
+    {
+      double q_i = q(i + q_offset);
+      double v_i = v(i + v_offset);
+      double q_mid = 0.5 * (lower_limit(i + q_offset) + upper_limit(i + q_offset));
+      double range = upper_limit(i + q_offset) - lower_limit(i + q_offset);
+      double norm = 2.0 * (q_i - q_mid) / range;
+      if ((q_mid < q_i && 0 < v_i) || (q_i < q_mid && v_i < 0))
+        w(i) = 1.0 + w_weight * norm * norm;
+    }
     Eigen::MatrixXd W_inv = w.cwiseInverse().asDiagonal();
 
-    // Eigen::MatrixXd JJt;
-    // JJt.noalias() = J * J.transpose() + damp * Eigen::MatrixXd::Identity(3, 3);
+    // calculate weighted v
     Eigen::MatrixXd JWJt = J * W_inv * J.transpose() + damp * Eigen::MatrixXd::Identity(3, 3);
-    Eigen::VectorXd v = Eigen::VectorXd::Zero(model.nv);
-    // v.tail(J.cols()) = J.transpose() * JJt.ldlt().solve(err);
     v.tail(J.cols()) = W_inv * J.transpose() * JWJt.ldlt().solve(err);
 
     double alpha = std::min(1.0, 1.0 / err.norm());
@@ -90,8 +97,8 @@ inline bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const 
     {
       std::cout << "jacobian:" << std::endl;
       std::cout << J << std::endl;
-      // std::cout << "JJt" << std::endl;
-      // std::cout << JJt << std::endl;
+      std::cout << "JJt" << std::endl;
+      std::cout << JJt << std::endl;
       std::cout << "W_inv" << std::endl;
       std::cout << W_inv << std::endl;
       std::cout << "JWJt" << std::endl;
