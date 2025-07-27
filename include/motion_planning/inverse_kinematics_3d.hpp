@@ -61,10 +61,27 @@ inline bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const 
       n_joint -= 6;
     J = J6.topRows(3).rightCols(n_joint);  // position. joint part
 
-    Eigen::MatrixXd JJt;
-    JJt.noalias() = J * J.transpose() + damp * Eigen::MatrixXd::Identity(3, 3);
+    // weight to avoid joint limit
+    Eigen::VectorXd upper_limit = model.upperPositionLimit;
+    Eigen::VectorXd lower_limit = model.lowerPositionLimit;
+    Eigen::VectorXd w = Eigen::VectorXd::Ones(n_joint);
+    int q_offset = is_floating_base ? 7 : 0;
+    int v_offset = is_floating_base ? 6 : 0;
+    for (int i = 0; i < n_joint; i++)
+      {
+        double q_mid = 0.5 * (lower_limit(i + q_offset) + upper_limit(i + q_offset));
+        double range = upper_limit(i + q_offset) - lower_limit(i + q_offset);
+        double norm = 2.0 * (q(i + q_offset) - q_mid) / range;
+        w(i) = 1.0 + 25 * norm * norm;
+      }
+    Eigen::MatrixXd W_inv = w.cwiseInverse().asDiagonal();
+
+    // Eigen::MatrixXd JJt;
+    // JJt.noalias() = J * J.transpose() + damp * Eigen::MatrixXd::Identity(3, 3);
+    Eigen::MatrixXd JWJt = J * W_inv * J.transpose() + damp * Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd v = Eigen::VectorXd::Zero(model.nv);
-    v.tail(J.cols()) = J.transpose() * JJt.ldlt().solve(err);
+    // v.tail(J.cols()) = J.transpose() * JJt.ldlt().solve(err);
+    v.tail(J.cols()) = W_inv * J.transpose() * JWJt.ldlt().solve(err);
 
     double alpha = std::min(1.0, 1.0 / err.norm());
     q = pinocchio::integrate(model, q, v * alpha);
@@ -73,8 +90,12 @@ inline bool solveIK(const pinocchio::Model& model, pinocchio::Data& data, const 
     {
       std::cout << "jacobian:" << std::endl;
       std::cout << J << std::endl;
-      std::cout << "JJt" << std::endl;
-      std::cout << JJt << std::endl;
+      // std::cout << "JJt" << std::endl;
+      // std::cout << JJt << std::endl;
+      std::cout << "W_inv" << std::endl;
+      std::cout << W_inv << std::endl;
+      std::cout << "JWJt" << std::endl;
+      std::cout << JWJt << std::endl;
       std::cout << "v:" << std::endl;
       std::cout << v.transpose() << std::endl;
       std::cout << "\n------------------------------\n" << std::endl;
